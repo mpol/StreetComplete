@@ -3,6 +3,7 @@ package de.westnordost.streetcomplete.overlays.way_lit
 import de.westnordost.streetcomplete.R
 import de.westnordost.streetcomplete.data.osm.mapdata.Element
 import de.westnordost.streetcomplete.data.osm.mapdata.MapDataWithGeometry
+import de.westnordost.streetcomplete.data.osm.mapdata.Node
 import de.westnordost.streetcomplete.data.osm.mapdata.filter
 import de.westnordost.streetcomplete.data.user.achievements.EditTypeAchievement.PEDESTRIAN
 import de.westnordost.streetcomplete.osm.ALL_PATHS
@@ -12,6 +13,7 @@ import de.westnordost.streetcomplete.osm.lit.LitStatus
 import de.westnordost.streetcomplete.osm.lit.parseLitStatus
 import de.westnordost.streetcomplete.overlays.Color
 import de.westnordost.streetcomplete.overlays.Overlay
+import de.westnordost.streetcomplete.overlays.PointStyle
 import de.westnordost.streetcomplete.overlays.PolygonStyle
 import de.westnordost.streetcomplete.overlays.PolylineStyle
 import de.westnordost.streetcomplete.overlays.StrokeStyle
@@ -26,13 +28,19 @@ class WayLitOverlay : Overlay {
     override val wikiLink: String = "Key:lit"
     override val achievements = listOf(PEDESTRIAN)
     override val hidesQuestTypes = setOf(AddWayLit::class.simpleName!!)
+    override val isCreateNodeEnabled = true
 
     override fun getStyledElements(mapData: MapDataWithGeometry) =
         mapData
             .filter("ways, relations with highway ~ ${(ALL_ROADS + ALL_PATHS).joinToString("|")}")
-            .map { it to getStyle(it) }
+            .map { it to getStyle(it) } +
+        mapData
+            .filter("nodes with highway = street_lamp")
+            .map { it to PointStyle("ic_preset_temaki_street_lamp_arm") }
 
-    override fun createForm(element: Element?) = WayLitOverlayForm()
+    override fun createForm(element: Element?) =
+        if (element == null || element is Node) StreetLanternForm()
+        else WayLitOverlayForm()
 }
 
 private fun getStyle(element: Element): Style {

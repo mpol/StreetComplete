@@ -148,7 +148,6 @@ private val IS_STREET_FURNITURE_EXPRESSION by lazy {
             // "speed_camera", - while not directly a sign, it definitely belongs into the traffic
             //                   signals/controls category
             // "speed_display", this is rather like a sign - signs should not go in here
-            "street_lamp", // candidate to be moved to lit overlay?
             "trailhead",
             // "traffic_mirror" is rather like a sign - signs should not go in here
         ),
@@ -252,7 +251,6 @@ private val IS_STREET_FURNITURE_EXPRESSION by lazy {
 
 val POPULAR_STREET_FURNITURE_FEATURE_IDS = listOf(
     "natural/tree/broadleaved",    // 4.0 M
-    "highway/street_lamp",         // 4.0 M
     "amenity/bench",               // 2.4 M
     "emergency/fire_hydrant",      // 2.0 M
 
