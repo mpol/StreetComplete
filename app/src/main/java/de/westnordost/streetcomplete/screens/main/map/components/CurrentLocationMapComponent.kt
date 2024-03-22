@@ -37,7 +37,7 @@ class CurrentLocationMapComponent(context: Context, mapStyle: Style, private val
         map.locationComponent.activateLocationComponent(LocationComponentActivationOptions.builder(context, mapStyle)
             .locationComponentOptions(LocationComponentOptions.builder(context)
                 .foregroundDrawable(R.drawable.location_dot)
-                .bearingDrawable(R.drawable.ic_quest_traffic_lights)
+                .bearingDrawable(R.drawable.location_direction)
                 .bearingTintColor(R.color.location_dot)
                 .accuracyColor(R.color.location_dot)
                 .accuracyAnimationEnabled(true)
@@ -55,8 +55,10 @@ class CurrentLocationMapComponent(context: Context, mapStyle: Style, private val
         when {
             isFollowingPosition && isNavigationMode ->
                 map.locationComponent.setCameraMode(CameraMode.TRACKING_GPS, 450L, 19.0, 0.0, 30.0, null)
-            isFollowingPosition -> CameraMode.TRACKING
-            else -> CameraMode.NONE
+            isFollowingPosition ->
+                map.locationComponent.setCameraMode(CameraMode.TRACKING, 450L, 19.0, 0.0, 30.0, null)
+            else ->
+                map.locationComponent.setCameraMode(CameraMode.NONE)
         }
     }
 }
