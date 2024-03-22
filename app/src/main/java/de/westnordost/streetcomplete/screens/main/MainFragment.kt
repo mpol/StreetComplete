@@ -662,7 +662,6 @@ class MainFragment :
     @SuppressLint("MissingPermission")
     private fun onLocationIsEnabled() {
         binding.gpsTrackingButton.state = LocationStateButton.State.SEARCHING
-        mapFragment!!.startPositionTracking()
 
         setIsFollowingPosition(wasFollowingPosition ?: true)
         locationManager.getCurrentLocation()
@@ -675,7 +674,6 @@ class MainFragment :
         }
         binding.gpsTrackingButton.isNavigation = false
         binding.locationPointerPin.visibility = View.GONE
-        mapFragment!!.clearPositionTracking()
         locationManager.removeUpdates()
     }
 
@@ -714,7 +712,6 @@ class MainFragment :
     private fun onClickCompassButton() {
         /* Clicking the compass button will always rotate the map back to north and remove tilt */
         val mapFragment = mapFragment ?: return
-        val camera = mapFragment.cameraPosition ?: return
 
         // if the user wants to rotate back north, it means he also doesn't want to use nav mode anymore
         if (mapFragment.isNavigationMode) {
@@ -766,15 +763,12 @@ class MainFragment :
         val mapFragment = mapFragment ?: return
         mapFragment.isNavigationMode = navigation
         binding.gpsTrackingButton.isNavigation = navigation
-        // always re-center position because navigation mode shifts the center position
-        mapFragment.centerCurrentPositionIfFollowing()
     }
 
     private fun setIsFollowingPosition(follow: Boolean) {
         val mapFragment = mapFragment ?: return
         mapFragment.isFollowingPosition = follow
         binding.gpsTrackingButton.isActivated = follow
-        if (follow) mapFragment.centerCurrentPositionIfFollowing()
     }
 
     /* -------------------------------------- Context Menu -------------------------------------- */

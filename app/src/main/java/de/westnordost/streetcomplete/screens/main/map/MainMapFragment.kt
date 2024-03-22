@@ -274,18 +274,19 @@ class MainMapFragment : LocationAwareMapFragment(), ShowsGeometryMarkers {
     /** Focus the view on the given geometry */
     fun startFocus(geometry: ElementGeometry, offset: RectF) {
         geometryMapComponent?.beginFocusGeometry(geometry, offset)
+        isFollowingPosition = false
     }
 
     /** End the focussing but do not return to position before focussing */
     fun clearFocus() {
         geometryMapComponent?.clearFocusGeometry()
-        centerCurrentPositionIfFollowing()
+        isFollowingPosition = true
     }
 
     /** return to the position before focussing */
     fun endFocus() {
         geometryMapComponent?.endFocusGeometry()
-        centerCurrentPositionIfFollowing()
+        isFollowingPosition = true
     }
 
     fun highlightPins(@DrawableRes iconResId: Int, pinPositions: Collection<LatLon>) {
@@ -355,10 +356,6 @@ class MainMapFragment : LocationAwareMapFragment(), ShowsGeometryMarkers {
     }
 
     /* --------------------------------- Position tracking -------------------------------------- */
-
-    override fun shouldCenterCurrentPosition(): Boolean =
-        // don't center position while displaying a quest
-        super.shouldCenterCurrentPosition() && geometryMapComponent?.isZoomedToContainGeometry != true
 
     companion object {
         // see streetcomplete.yaml for the definitions of the below layers

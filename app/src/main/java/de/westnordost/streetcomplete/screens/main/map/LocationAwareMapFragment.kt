@@ -2,16 +2,12 @@ package de.westnordost.streetcomplete.screens.main.map
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.hardware.SensorManager
 import android.location.Location
 import android.os.Bundle
-import android.view.WindowManager
-import androidx.core.content.getSystemService
 import org.maplibre.android.maps.MapLibreMap
 import de.westnordost.streetcomplete.Prefs
 import de.westnordost.streetcomplete.data.location.RecentLocationStore
 import org.maplibre.android.maps.Style
-import de.westnordost.streetcomplete.data.osm.mapdata.LatLon
 import de.westnordost.streetcomplete.data.osmtracks.Trackpoint
 import de.westnordost.streetcomplete.screens.main.map.components.CurrentLocationMapComponent
 import de.westnordost.streetcomplete.screens.main.map.components.TracksMapComponent
@@ -38,7 +34,6 @@ open class LocationAwareMapFragment : MapFragment() {
     private val recentLocationStore: RecentLocationStore by inject()
     private val prefs: Preferences by inject()
 
-    private lateinit var compass: Compass
     private lateinit var locationManager: FineLocationManager
 
     private var locationMapComponent: CurrentLocationMapComponent? = null
@@ -61,27 +56,14 @@ open class LocationAwareMapFragment : MapFragment() {
     val recordedTracks: List<Trackpoint> get() = _recordedTracks
 
     /** Whether the view should automatically center on the GPS location */
-    var isFollowingPosition = true
-        set(value) {
-            field = value
-            if (field != value && !value) {
-                _isNavigationMode = false
-            }
-        }
+    var isFollowingPosition
+        set(value) { locationMapComponent?.isFollowingPosition = value }
+        get() = locationMapComponent?.isFollowingPosition ?: false
 
     /** Whether the view should automatically rotate with bearing (like during navigation) */
-    private var _isNavigationMode: Boolean = false
     var isNavigationMode: Boolean
-        set(value) {
-            if (_isNavigationMode != value && !value) {
-                updateCameraPosition(300) { tilt = 0.0 }
-            }
-            _isNavigationMode = value
-        }
-        get() = _isNavigationMode
-
-    /** When the view follows the GPS position, whether the view already zoomed to the location once*/
-    private var zoomedYet = false
+        set(value) { locationMapComponent?.isNavigationMode = value }
+        get() = locationMapComponent?.isNavigationMode ?: false
 
     interface Listener {
         /** Called after the map fragment updated its displayed location */
@@ -100,12 +82,6 @@ open class LocationAwareMapFragment : MapFragment() {
 
     override fun onAttach(context: Context) {
         super.onAttach(context)
-        compass = Compass(
-            context.getSystemService<SensorManager>()!!,
-            context.getSystemService<WindowManager>()!!.defaultDisplay,
-            this::onCompassRotationChanged
-        )
-        lifecycle.addObserver(compass)
         locationManager = FineLocationManager(context, this::onLocationChanged)
     }
 
@@ -127,9 +103,9 @@ open class LocationAwareMapFragment : MapFragment() {
 
     override fun onStop() {
         super.onStop()
+        locationManager.removeUpdates()
         locationAvailabilityReceiver.removeListener(::updateLocationAvailability)
         saveMapState()
-        stopPositionTracking()
     }
 
     /* ---------------------------------- Map State Callbacks ----------------------------------- */
@@ -140,52 +116,23 @@ open class LocationAwareMapFragment : MapFragment() {
 
         val ctx = context ?: return
         locationMapComponent = CurrentLocationMapComponent(ctx, style, map)
-        locationMapComponent?.location = displayedLocation
 
         tracksMapComponent = TracksMapComponent(map)
         val positionsLists = tracks.map { track -> track.map { it.position } }
         tracksMapComponent?.setTracks(positionsLists, isRecordingTracks)
 
         tracksMapComponent?.layers?.forEach { map.style?.addLayer(it) }
-        locationMapComponent?.layers?.forEach { map.style?.addLayer(it) }
 
-        centerCurrentPositionIfFollowing()
-    }
-
-    override fun onMapIsChanging(position: LatLon, rotation: Double, tilt: Double, zoom: Double) {
-        super.onMapIsChanging(position, rotation, tilt, zoom)
-        locationMapComponent?.currentMapZoom = zoom
+        updateLocationAvailability(requireContext().isLocationAvailable)
     }
 
     /* --------------------------------- Position tracking -------------------------------------- */
-
-    @SuppressLint("MissingPermission")
-    fun startPositionTracking() {
-        locationMapComponent?.isVisible = true
-        locationManager.requestUpdates(0, 5000, 1f)
-    }
-
-    fun stopPositionTracking() {
-        locationMapComponent?.isVisible = false
-        locationManager.removeUpdates()
-    }
-
-    fun clearPositionTracking() {
-        stopPositionTracking()
-        displayedLocation = null
-        isNavigationMode = false
-
-        tracks = ArrayList()
-        tracks.add(ArrayList())
-
-        tracksMapComponent?.clear()
-    }
 
     fun startPositionTrackRecording() {
         isRecordingTracks = true
         _recordedTracks.clear()
         tracks.add(ArrayList())
-        locationMapComponent?.isVisible = true
+        locationMapComponent?.isEnabled = true
         tracksMapComponent?.startNewTrack(true)
     }
 
@@ -197,39 +144,21 @@ open class LocationAwareMapFragment : MapFragment() {
         tracksMapComponent?.startNewTrack(false)
     }
 
-    protected open fun shouldCenterCurrentPosition(): Boolean {
-        return isFollowingPosition
-    }
-
-    fun centerCurrentPosition() {
-        val displayedPosition = displayedLocation?.toLatLon() ?: return
-
-        updateCameraPosition(600) {
-            if (isNavigationMode) {
-                val bearing = getTrackBearing(tracks.last())
-                if (bearing != null) {
-                    rotation = -(bearing * PI / 180.0)
-                }
-                tilt = 60.0 // looks like we use degrees
-            }
-
-            position = displayedPosition
-
-            if (!zoomedYet) {
-                zoomedYet = true
-                zoom = 19.0
-            }
-        }
-    }
-
-    fun centerCurrentPositionIfFollowing() {
-        if (shouldCenterCurrentPosition()) centerCurrentPosition()
-    }
-
+    @SuppressLint("MissingPermission")
     private fun updateLocationAvailability(isAvailable: Boolean) {
-        if (!isAvailable) {
+        locationMapComponent?.isEnabled = isAvailable
+        if (isAvailable) {
+            locationManager.requestUpdates(0, 5000, 1f)
+        } else {
+            locationManager.removeUpdates()
             displayedLocation = null
-            locationMapComponent?.location = null
+            isFollowingPosition = false
+            isNavigationMode = false
+
+            tracks = ArrayList()
+            tracks.add(ArrayList())
+
+            tracksMapComponent?.clear()
         }
     }
 
@@ -237,10 +166,7 @@ open class LocationAwareMapFragment : MapFragment() {
         viewLifecycleScope.launch {
             displayedLocation = location
             recentLocationStore.add(location)
-            locationMapComponent?.location = location
             addTrackLocation(location)
-//          compass.setLocation(location)
-            centerCurrentPositionIfFollowing()
             listener?.onDisplayedLocationDidChange()
         }
     }
@@ -267,12 +193,6 @@ open class LocationAwareMapFragment : MapFragment() {
             delay(600)
             withContext(Dispatchers.Main) { tracksMapComponent?.addToCurrentTrack(trackpoint.position) }
         }
-    }
-
-    /* --------------------------------- Rotation tracking -------------------------------------- */
-
-    private fun onCompassRotationChanged(rot: Float, tilt: Float) {
-        locationMapComponent?.rotation = rot * 180 / PI
     }
 
     /* -------------------------------- Save and Restore State ---------------------------------- */
